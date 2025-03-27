@@ -15,6 +15,27 @@ usuarios = {}
 # Armazena mensagens já processadas para evitar duplicação
 mensagens_processadas = set()
 
+# Tabela de taxas (centralizada)
+taxas = {
+    1: 23.00, 2: 55.00, 3: 55.10, 4: 55.20, 5: 55.30,
+    6: 55.40, 7: 55.47, 8: 55.60, 9: 55.70, 10: 55.80,
+    11: 55.87, 12: 56.00, 13: 67.05, 14: 67.30, 15: 67.55,
+    16: 67.68, 17: 67.79, 18: 67.94
+}
+
+# Função utilitária para calcular o máximo que pode ser sacado
+def calcular_maximo_saque(limite, parcelas):
+    taxa = taxas.get(parcelas, 55.0) / 100
+    return limite / (1 + taxa)
+
+# Função para calcular valor de saque e parcela formatada
+def calcular_saque_e_parcela(limite, parcelas):
+    valor_saque = calcular_maximo_saque(limite, parcelas)
+    valor_parcela = valor_saque / parcelas
+    saque_fmt = f"R$ {valor_saque:,.2f}".replace(".", ",")
+    parcela_fmt = f"R$ {valor_parcela:,.2f}".replace(".", ",")
+    return saque_fmt, parcela_fmt
+
 # Trata mensagens do webhook (textos ou botões interativos)
 def tratar_interacao(sender, message, msg_type):
     message_id = message['id']
@@ -49,6 +70,7 @@ def tratar_texto(sender, texto):
     elif estado == "informar_valor":
         if texto.isdigit():
             usuarios[sender]["respostas"]["limite"] = int(texto)
+            responder(sender, f"✅ Perfeito! Limite de R$ {int(texto):,} anotado. 💳")
             etapa_informar_parcelas(sender)
         else:
             responder(sender, "Por favor, informe apenas números. Exemplo: 1500")
@@ -58,11 +80,37 @@ def tratar_texto(sender, texto):
             parcelas = int(texto)
             if 1 <= parcelas <= 18:
                 usuarios[sender]["respostas"]["parcelas"] = parcelas
+                responder(sender, f"📆 Parcelamento em {parcelas}x registrado. Agora vamos calcular sua simulação...")
                 etapa_calculo(sender)
             else:
                 responder(sender, "Digite um número entre 1 e 18.")
         else:
             responder(sender, "Por favor, informe apenas números. Exemplo: 6")
+
+    elif estado == "novo_valor":
+        if texto.isdigit():
+            valor_desejado = int(texto)
+            limite = usuarios[sender]["respostas"].get("limite")
+
+            parcelas_disponiveis = None
+            for p in range(1, 19):
+                maximo_saque = calcular_maximo_saque(limite, p)
+                if maximo_saque >= valor_desejado:
+                    parcelas_disponiveis = p
+                else:
+                    break
+
+            if parcelas_disponiveis:
+                usuarios[sender]["respostas"]["parcelas"] = parcelas_disponiveis
+                usuarios[sender]["respostas"]["limite"] = limite
+                responder(sender, f"📊 Para sacar R$ {valor_desejado:,.2f}, será possível em até *{parcelas_disponiveis}x* parcelas.")
+                etapa_calculo(sender)
+            else:
+                maximo_1x = calcular_maximo_saque(limite, 1)
+                saque_fmt = f"R$ {maximo_1x:,.2f}".replace(".", ",")
+                responder(sender, f"⚠️ Com base no seu limite, o valor máximo possível para saque é *{saque_fmt}* (em 1x). Por favor, tente outro valor.")
+        else:
+            responder(sender, "Por favor, informe apenas o novo valor numérico. Exemplo: 2000")
 
 # === BOTÕES ===
 def tratar_botao(sender, resposta_id):
@@ -81,7 +129,8 @@ def tratar_botao(sender, resposta_id):
         usuarios.pop(sender, None)
 
     elif resposta_id == "refazer_simulacao":
-        etapa_informar_valor(sender)
+        usuarios[sender]["estado"] = "novo_valor"
+        responder(sender, "Certo! Qual valor você deseja sacar? 💰\nDigite apenas o valor numérico.")
 
     elif resposta_id == "falar_atendente":
         responder(sender, "Certo! Em instantes um atendente humano vai te chamar. 🧑‍💼")
@@ -104,24 +153,12 @@ def etapa_informar_parcelas(sender):
     usuarios[sender]["estado"] = "informar_parcelas"
     responder(sender, "Em quantas vezes deseja parcelar? (1 a 18 vezes)")
 
+# === ETAPA DE CÁLCULO REAPROVEITADA ===
 def etapa_calculo(sender):
     dados = usuarios[sender]["respostas"]
     limite = dados.get("limite")
     parcelas = dados.get("parcelas")
-
-    taxas = {
-        1: 23.00, 2: 55.00, 3: 55.10, 4: 55.20, 5: 55.30,
-        6: 55.40, 7: 55.47, 8: 55.60, 9: 55.70, 10: 55.80,
-        11: 55.87, 12: 56.00, 13: 67.05, 14: 67.30, 15: 67.55,
-        16: 67.68, 17: 67.79, 18: 67.94
-    }
-    taxa = taxas.get(parcelas, 55.0) / 100
-    valor_saque = limite / (1 + taxa)
-    valor_parcela = valor_saque / parcelas
-
-    saque_fmt = f"R$ {valor_saque:,.2f}".replace(".", ",")
-    parcela_fmt = f"R$ {valor_parcela:,.2f}".replace(".", ",")
-
+    saque_fmt, parcela_fmt = calcular_saque_e_parcela(limite, parcelas)
     usuarios[sender]["estado"] = "pos_calculo"
     etapa_decisao_final(sender, saque_fmt, parcela_fmt)
 
