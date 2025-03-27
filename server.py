@@ -2,10 +2,14 @@
 
 from flask import Flask, request
 from ester_funcoes import tratar_interacao
+from dotenv import load_dotenv
+import os
 
 app = Flask(__name__)
 
-VERIFY_TOKEN = 'vitor-martins-server'
+load_dotenv()
+
+VERIFY_TOKEN = os.getenv('VERIFY_TOKEN')
 
 # Endpoint do webhook do WhatsApp
 @app.route('/webhook', methods=['GET', 'POST'])

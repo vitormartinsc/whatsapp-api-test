@@ -1,9 +1,13 @@
 # === Arquivo: ester_funcoes.py ===
 
 import requests
+import os
+from dotenv import load_dotenv
 
-ACCESS_TOKEN = 'EAAHxtVtpb9IBOzf6jADvZBmQsbkSSdrx7MAVFD4QYDSYCVfhZBrmleJafxaxaZCdqyygZCvRXNfZAmguCWftt3joHbFdqRbyDn5YDqKQ3tXtd8ZBjBPuSwn3gSZBuqVax519OjtIWnVrKRcyfrL2ewPAIagXxLGk9DvBgRf9UaJAIZAVxynaTdQqdlikVOenTGOefwiCGoDfC23qFgeqy3aJ9j6z8ftdpAZDZD'
-PHONE_NUMBER_ID = '556876514183773'
+load_dotenv()
+
+ACCESS_TOKEN = os.getenv('ACCESS_TOKEN')
+PHONE_NUMBER_ID = os.getenv('PHONE_NUMBER_ID')
 API_VERSION = 'v22.0'
 
 usuarios = {}
